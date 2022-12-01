@@ -10,6 +10,11 @@ class InstallCommand extends Command
 
     protected $description = '';
 
+    /**
+     * List of services
+     *
+     * @var string[]
+     */
     protected $services = [
         'phpmyadmin',
     ];
@@ -30,7 +35,7 @@ class InstallCommand extends Command
 
         $dockerCompose = file_get_contents($this->laravel->basePath('docker-compose.yml'));
 
-        $servicesString = $this->getStringServicesFromDockerCompose($dockerCompose);
+        $servicesString = $this->getServicesAsString($dockerCompose);
 
         $existingServices = $this->getExistingServices($services, $servicesString);
 
@@ -41,36 +46,47 @@ class InstallCommand extends Command
             $this->info('Ignoring existing services...');
         }
 
-        $this->addServicesToDockerCompose($services);
+        $this->appendServicesToDockerCompose($services);
 
         $this->newLine();
         $this->info('Services installed successfully.');
     }
 
-    protected function transformServices(array $services, string $from): string
+    /**
+     * @param  string[]  $services
+     * @return string
+     */
+    protected function getServiceStubs(array $services): string
     {
-        $stubs = collect($services)->map(function ($service) {
+        return collect($services)->map(function ($service) {
             return file_get_contents(__DIR__.'/../../stubs/'.$service.'.stub');
         })->implode('');
-
-        return $from.$stubs;
     }
 
-    protected function addServicesToDockerCompose($services)
+    /**
+     *  @param  string[]  $services
+     *  @return void
+     */
+    protected function appendServicesToDockerCompose(array $services): void
     {
         $dockerCompose = file_get_contents($this->laravel->basePath('docker-compose.yml'));
 
-        $servicesFromDockerCompose = $this->getStringServicesFromDockerCompose($dockerCompose);
+        $servicesFromDockerCompose = $this->getServicesAsString($dockerCompose);
 
-        $finalServices = $this->transformServices($services, $servicesFromDockerCompose);
-
-        $dockerCompose = str_replace($servicesFromDockerCompose, $finalServices, $dockerCompose);
+        $dockerCompose = str_replace($servicesFromDockerCompose, $servicesFromDockerCompose.$this->getServiceStubs($services), $dockerCompose);
 
         // write $dockerCompose to file
         file_put_contents($this->laravel->basePath('docker-compose.yml'), $dockerCompose);
     }
 
-    protected function getExistingServices($services, $from)
+    /**
+     * Get existing services
+     *
+     * @param  string[]  $services
+     * @param  string  $from
+     * @return string[]
+     */
+    protected function getExistingServices($services, $from): array
     {
         $regex = '/'.implode('|', array_map(function ($service) {
             return '(?<=[^\S]\s)'.$service.'(?=:)'; // Match service name followed by ':' (e.g. mysql:) and preceded only by whitespace
@@ -81,12 +97,7 @@ class InstallCommand extends Command
         return array_values($matches[0]);
     }
 
-    /**
-     *
-     * @param string $dockerCompose
-     * @return string
-     */
-    protected function getStringServicesFromDockerCompose($dockerCompose)
+    protected function getServicesAsString(string $dockerCompose): string
     {
         $regex = '/services:\n(?:\s+.*\n)*/';
 
