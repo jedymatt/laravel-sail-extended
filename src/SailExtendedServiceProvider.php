@@ -15,7 +15,7 @@ class SailExtendedServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                Console\InstallCommand::class,
+                Console\AddServicesCommand::class,
             ]);
         }
     }
