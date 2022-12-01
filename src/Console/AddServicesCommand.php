@@ -4,9 +4,9 @@ namespace Jedymatt\LaravelSailExtended\Console;
 
 use Illuminate\Console\Command;
 
-class InstallCommand extends Command
+class AddServicesCommand extends Command
 {
-    protected $signature = 'sail:ext-install';
+    protected $signature = 'sail:add';
 
     protected $description = '';
 
