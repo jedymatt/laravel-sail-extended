@@ -6,7 +6,7 @@ use Illuminate\Console\Command;
 
 class InstallCommand extends Command
 {
-    protected $signature = 'sail:extend-install';
+    protected $signature = 'sail:ext-install';
 
     protected $description = '';
 
