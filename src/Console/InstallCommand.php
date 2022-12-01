@@ -10,6 +10,11 @@ class InstallCommand extends Command
 
     protected $description = '';
 
+    /**
+     * List of services
+     *
+     * @var string[]
+     */
     protected $services = [
         'phpmyadmin',
     ];
@@ -24,55 +29,80 @@ class InstallCommand extends Command
             return;
         }
 
+        $this->newLine();
         $this->info('Installing services...');
-        $this->comment('[' . implode(', ', $services) . ']');
+        $this->comment('['.implode(', ', $services).']');
 
-        $this->addServicesToDockerCompose($services);
+        $dockerCompose = file_get_contents($this->laravel->basePath('docker-compose.yml'));
+
+        $servicesString = $this->getServicesAsString($dockerCompose);
+
+        $existingServices = $this->getExistingServices($services, $servicesString);
+
+        if (! empty($existingServices)) {
+            $services = array_diff($services, $existingServices);
+
+            $this->newLine();
+            $this->info('Ignoring existing services...');
+        }
+
+        $this->appendServicesToDockerCompose($services);
 
         $this->newLine();
         $this->info('Services installed successfully.');
     }
 
-    protected function addServicesToDockerCompose($services)
+    /**
+     * @param  string[]  $services
+     * @return string
+     */
+    protected function getServiceStubs(array $services): string
+    {
+        return collect($services)->map(function ($service) {
+            return file_get_contents(__DIR__.'/../../stubs/'.$service.'.stub');
+        })->implode('');
+    }
+
+    /**
+     *  @param  string[]  $services
+     *  @return void
+     */
+    protected function appendServicesToDockerCompose(array $services): void
     {
         $dockerCompose = file_get_contents($this->laravel->basePath('docker-compose.yml'));
 
-        $existingServices = $this->getExistingServicesFromDockerCompose($services, $dockerCompose);
+        $servicesFromDockerCompose = $this->getServicesAsString($dockerCompose);
 
-        if (count($existingServices) !== 0) {
-            $services = array_diff($services, $existingServices);
-            
-            $this->newLine();
-            $this->info('Ignoring existing services...');
-        }
-
-        $regex = '/services:\n(?:\s+.*\n)*/';
-
-        preg_match_all($regex, $dockerCompose, $matches);
-
-        $servicesFromDockerCompose = $matches[0][0];
-
-        $stubs = collect($services)->map(function ($service) {
-            return file_get_contents(__DIR__ . "/../../stubs/{$service}.stub");
-        })->implode('');
-
-        $servicesFromDockerCompose .= $stubs;
-
-        // replace $servicesFromDockerCompose in $dockerCompose
-        $dockerCompose = preg_replace($regex, $servicesFromDockerCompose, $dockerCompose);
+        $dockerCompose = str_replace($servicesFromDockerCompose, $servicesFromDockerCompose.$this->getServiceStubs($services), $dockerCompose);
 
         // write $dockerCompose to file
         file_put_contents($this->laravel->basePath('docker-compose.yml'), $dockerCompose);
     }
 
-    protected function getExistingServicesFromDockerCompose($services, $dockerCompose)
+    /**
+     * Get existing services
+     *
+     * @param  string[]  $services
+     * @param  string  $from
+     * @return string[]
+     */
+    protected function getExistingServices($services, $from): array
     {
-        $regex = '/' . implode('|', array_map(function ($service) {
-            return '(?<=[^\S]\s)' . $service . '(?=:)'; // Match service name followed by ':' (e.g. mysql:) and preceded only by whitespace
-        }, $services)) . '/';
+        $regex = '/'.implode('|', array_map(function ($service) {
+            return '(?<=[^\S]\s)'.$service.'(?=:)'; // Match service name followed by ':' (e.g. mysql:) and preceded only by whitespace
+        }, $services)).'/';
+
+        preg_match_all($regex, $from, $matches);
+
+        return array_values($matches[0]);
+    }
+
+    protected function getServicesAsString(string $dockerCompose): string
+    {
+        $regex = '/(?<=^services:$\n)(?:\s+.*\n)*/m';
 
         preg_match_all($regex, $dockerCompose, $matches);
 
-        return array_values($matches[0]);
+        return $matches[0][0];
     }
 }
