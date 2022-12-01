@@ -1,0 +1,34 @@
+{
+    "name": "jedymatt/laravel-sail-extended",
+    "type": "library",
+    "require": {
+        "php": "^7.3|^8.0",
+        "laravel/sail": "^1.0",
+        "jedymatt/laravel-sail-env": "^1.0",
+        "illuminate/console": "^8.0|^9.0",
+        "illuminate/support": "^8.0|^9.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Jedymatt\\LaravelSailExtended\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Jedy Matt Tabasco",
+            "email": "jedymatt@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Jedymatt\\LaravelSailExtended\\SailExtendedServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
