@@ -99,7 +99,7 @@ class InstallCommand extends Command
 
     protected function getServicesAsString(string $dockerCompose): string
     {
-        $regex = '/(?<=services:\n)(?:\s+.*\n)*/';
+        $regex = '/(?<=^services:$\n)(?:\s+.*\n)*/m';
 
         preg_match_all($regex, $dockerCompose, $matches);
 
