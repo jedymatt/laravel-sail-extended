@@ -24,8 +24,22 @@ class InstallCommand extends Command
             return;
         }
 
+        $this->newLine();
         $this->info('Installing services...');
-        $this->comment('[' . implode(', ', $services) . ']');
+        $this->comment('['.implode(', ', $services).']');
+
+        $dockerCompose = file_get_contents($this->laravel->basePath('docker-compose.yml'));
+
+        $servicesString = $this->getStringServicesFromDockerCompose($dockerCompose);
+
+        $existingServices = $this->getExistingServices($services, $servicesString);
+
+        if (! empty($existingServices)) {
+            $services = array_diff($services, $existingServices);
+
+            $this->newLine();
+            $this->info('Ignoring existing services...');
+        }
 
         $this->addServicesToDockerCompose($services);
 
@@ -33,46 +47,51 @@ class InstallCommand extends Command
         $this->info('Services installed successfully.');
     }
 
+    protected function transformServices(array $services, string $from): string
+    {
+        $stubs = collect($services)->map(function ($service) {
+            return file_get_contents(__DIR__.'/../../stubs/'.$service.'.stub');
+        })->implode('');
+
+        return $from.$stubs;
+    }
+
     protected function addServicesToDockerCompose($services)
     {
         $dockerCompose = file_get_contents($this->laravel->basePath('docker-compose.yml'));
 
-        $existingServices = $this->getExistingServicesFromDockerCompose($services, $dockerCompose);
+        $servicesFromDockerCompose = $this->getStringServicesFromDockerCompose($dockerCompose);
 
-        if (count($existingServices) !== 0) {
-            $services = array_diff($services, $existingServices);
-            
-            $this->newLine();
-            $this->info('Ignoring existing services...');
-        }
+        $finalServices = $this->transformServices($services, $servicesFromDockerCompose);
 
-        $regex = '/services:\n(?:\s+.*\n)*/';
-
-        preg_match_all($regex, $dockerCompose, $matches);
-
-        $servicesFromDockerCompose = $matches[0][0];
-
-        $stubs = collect($services)->map(function ($service) {
-            return file_get_contents(__DIR__ . "/../../stubs/{$service}.stub");
-        })->implode('');
-
-        $servicesFromDockerCompose .= $stubs;
-
-        // replace $servicesFromDockerCompose in $dockerCompose
-        $dockerCompose = preg_replace($regex, $servicesFromDockerCompose, $dockerCompose);
+        $dockerCompose = str_replace($servicesFromDockerCompose, $finalServices, $dockerCompose);
 
         // write $dockerCompose to file
         file_put_contents($this->laravel->basePath('docker-compose.yml'), $dockerCompose);
     }
 
-    protected function getExistingServicesFromDockerCompose($services, $dockerCompose)
+    protected function getExistingServices($services, $from)
     {
-        $regex = '/' . implode('|', array_map(function ($service) {
-            return '(?<=[^\S]\s)' . $service . '(?=:)'; // Match service name followed by ':' (e.g. mysql:) and preceded only by whitespace
-        }, $services)) . '/';
+        $regex = '/'.implode('|', array_map(function ($service) {
+            return '(?<=[^\S]\s)'.$service.'(?=:)'; // Match service name followed by ':' (e.g. mysql:) and preceded only by whitespace
+        }, $services)).'/';
+
+        preg_match_all($regex, $from, $matches);
+
+        return array_values($matches[0]);
+    }
+
+    /**
+     *
+     * @param string $dockerCompose
+     * @return string
+     */
+    protected function getStringServicesFromDockerCompose($dockerCompose)
+    {
+        $regex = '/services:\n(?:\s+.*\n)*/';
 
         preg_match_all($regex, $dockerCompose, $matches);
 
-        return array_values($matches[0]);
+        return $matches[0][0];
     }
 }
