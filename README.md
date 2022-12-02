@@ -11,8 +11,8 @@ php artisan sail:env
 ```
 
 ```sh
-php artisan sail:extend-install
+php artisan sail:add
 ```
 
-Available services to install:
+Available services to add:
 - phpmyadmin
